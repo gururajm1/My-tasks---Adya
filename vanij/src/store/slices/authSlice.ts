@@ -18,7 +18,6 @@ export const verifyUserPassword = createAsyncThunk(
   async ({ id, password, token }: LoginCredentials, { rejectWithValue }) => {
     try {
       const response = await verifyPassword(id, password, token);
-      // Return the response with the token for successful verification
       return { ...response, token };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Verification failed');
@@ -26,7 +25,7 @@ export const verifyUserPassword = createAsyncThunk(
   }
 );
 
-const EMAIL_REGEX = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+// const EMAIL_REGEX = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const authSlice = createSlice({
   name: 'auth',
@@ -51,11 +50,11 @@ const authSlice = createSlice({
         return;
       }
 
-      if (!EMAIL_REGEX.test(email)) {
-        state.emailValidation.isValid = false;
-        state.emailValidation.error = 'Invalid email format';
-        return;
-      }
+      // if (!EMAIL_REGEX.test(email)) {
+      //   state.emailValidation.isValid = false;
+      //   state.emailValidation.error = 'Invalid email format';
+      //   return;
+      // }
 
       state.emailValidation.isValid = true;
       state.emailValidation.error = null;

@@ -7,19 +7,14 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   useEffect(() => {
-    // Check authentication status when component mounts or when localStorage changes
     const checkAuth = () => {
       const token = localStorage.getItem("token");
       setIsAuthenticated(!!token);
     };
     
-    // Initial check
     checkAuth();
     
-    // Set up event listener for storage changes
     window.addEventListener("storage", checkAuth);
-    
-    // Custom event for auth changes from within the app
     window.addEventListener("authChange", checkAuth);
     
     return () => {
@@ -40,7 +35,7 @@ function App() {
         {/* Default redirect */}
         <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
         
-        {/* Catch all other routes */}
+        {/* Catch routes */}
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
       </Routes>
     </BrowserRouter>

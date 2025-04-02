@@ -3,7 +3,7 @@ import blurredImage from "../assets/blurredImage.png"
 import adyaLogo from '../assets/adyaLogo.png'
 import { ArrowRight, Lock, Eye, EyeOff, Mail } from "lucide-react"
 import { useDispatch } from 'react-redux'
-import { verifyUserPassword } from '../store/slices/authslice'
+import { verifyUserPassword, validateEmail as validateEmailAction } from '../store/slices/authSlice'
 import { useNavigate } from 'react-router-dom'
 
 const Login = () => {
@@ -19,8 +19,8 @@ const Login = () => {
   const [error, setError] = useState('')
   
   const validateEmail = (email: string) => {
-    const gmailRegex = /@gmail\.com$/i
-    return gmailRegex.test(email)
+   // const gmailRegex =
+    return email
   }
 
   const handleEmailSubmit = (e: React.FormEvent) => {
@@ -36,6 +36,7 @@ const Login = () => {
     }
     
     setEmailError('')
+    dispatch(validateEmailAction(email))
     setEmailVerified(true)
   }
 
@@ -45,9 +46,9 @@ const Login = () => {
     setError('');
     try {
       const loginData = {
-        id: 3145,
+        id: import.meta.env.VITE_USER_ID ? Number(import.meta.env.VITE_USER_ID) : 0,
         password: password,
-        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb21wYW55X2lkIjoyMDA0LCJlbWFpbCI6Im1vbmEwNjU0N0BnbWFpbC5jb20iLCJleHAiOjE3MzcwMjQ0MTcsImlkIjoyMDI2LCJtb2JpbGVfbnVtYmVyIjoiODc3ODg2NDM0NSIsInJvbGVzIjp7ImNvZGUiOiJURUFNX01FTUJFUiIsIm5hbWUiOiJURUFNX01FTUJFUiJ9fQ.FAFb8DgXAxo14-AdJS_KEl2fmjmSpTPTHUENRQiMrQk'
+        token: import.meta.env.VITE_AUTH_TOKEN || ''
       };
       
       const response = await dispatch(verifyUserPassword(loginData));
@@ -61,10 +62,16 @@ const Login = () => {
         navigate('/dashboard', { replace: true });
       } else {
         setError('Invalid password. Please try again.');
+        localStorage.removeItem('token');
+        window.dispatchEvent(new Event('authChange'));
+        navigate('/login', { replace: true });
       }
     } catch (error: any) {
       console.error('Login failed:', error);
       setError(error.message || 'Login failed. Please try again.');
+      localStorage.removeItem('token');
+      window.dispatchEvent(new Event('authChange'));
+      navigate('/login', { replace: true });
     } finally {
       setLoading(false);
     }

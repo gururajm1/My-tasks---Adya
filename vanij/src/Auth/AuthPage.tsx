@@ -1,13 +1,13 @@
-"use client"
-
 import { useState } from "react"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, MessageSquare } from "lucide-react"
+import { useSelector } from "react-redux"
+import { selectEmailValidation } from "../store/slices/authSlice"
 
 const AuthPage = () => {
   const [authMethod, setAuthMethod] = useState<"password" | "otp">("password")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const email = "d***r@adya.ai"
+  const { email } = useSelector(selectEmailValidation)
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
