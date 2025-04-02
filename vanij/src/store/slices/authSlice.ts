@@ -18,7 +18,8 @@ export const verifyUserPassword = createAsyncThunk(
   async ({ id, password, token }: LoginCredentials, { rejectWithValue }) => {
     try {
       const response = await verifyPassword(id, password, token);
-      return response;
+      // Return the response with the token for successful verification
+      return { ...response, token };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Verification failed');
     }

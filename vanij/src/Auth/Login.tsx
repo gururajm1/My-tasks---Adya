@@ -51,9 +51,16 @@ const Login = () => {
       };
       
       const response = await dispatch(verifyUserPassword(loginData));
-      if (response.payload) {
+      if (response.payload && !response.error) {
         localStorage.setItem('token', loginData.token);
-        navigate('/dashboard');
+        
+        window.dispatchEvent(new Event('authChange'));
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        navigate('/dashboard', { replace: true });
+      } else {
+        setError('Invalid password. Please try again.');
       }
     } catch (error: any) {
       console.error('Login failed:', error);

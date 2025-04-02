@@ -41,7 +41,7 @@ axiosInstance.interceptors.response.use(
   (error) => {
     console.error('API Error:', error.response?.data || error.message);
     
-    if (error.response?.status === 401 || error.response?.data?.error?.name === 'Incorrect Password') {
+    if (error.response?.status === 401 ) {
       console.log('Unauthorized: Redirecting to login...');
       window.location.href = '/login';
     }
