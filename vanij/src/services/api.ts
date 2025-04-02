@@ -1,7 +1,5 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.API_BASE_URL;
-
 const axiosInstance = axios.create({
   baseURL: 'https://vanijapp.adya.ai/api/v1/vanij/gateway/backend', 
   headers: {

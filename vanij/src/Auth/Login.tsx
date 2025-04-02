@@ -3,7 +3,7 @@ import blurredImage from "../assets/blurredImage.png"
 import adyaLogo from '../assets/adyaLogo.png'
 import { ArrowRight, Lock, Eye, EyeOff, Mail } from "lucide-react"
 import { useDispatch } from 'react-redux'
-import { verifyUserPassword } from '../store/slices/authSlice'
+import { verifyUserPassword } from '../store/slices/authslice'
 import { useNavigate } from 'react-router-dom'
 
 const Login = () => {
@@ -274,4 +274,3 @@ const Login = () => {
 }
 
 export default Login
-
