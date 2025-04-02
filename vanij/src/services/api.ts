@@ -1,41 +1,55 @@
-import axios from 'axios'
-import { store } from '../store'
-import { logout } from '../store/slices/authSlice'
+import axios from 'axios';
 
-const baseURL = 'http://localhost:3000/api'
+const baseURL = import.meta.env.API_BASE_URL;
 
-export const api = axios.create({
-  baseURL,
+const axiosInstance = axios.create({
+  baseURL: 'https://vanijapp.adya.ai/api/v1/vanij/gateway/backend', 
   headers: {
-    'Content-Type': 'application/json'
-  }
-})
+    'Content-Type': 'application/json',
+  },
+});
 
-api.interceptors.request.use(
-  (config) => {
-    const token = store.getState().auth.token
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+export const verifyPassword = async (id: number, password: string, token: string) => {
+  const response = await axiosInstance.post('/user/verify_password', {
+    id,
+    password
+  }, {
+    headers: {
+      Authorization: `Bearer ${token}`
     }
-    return config
+  });
+  return response.data;
+};
+
+// interceptor
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
   },
   (error) => {
-    return Promise.reject(error)
+    return Promise.reject(error);
   }
-)
+);
 
-api.interceptors.response.use(
-  (response) => response,
+// interceptor res
+axiosInstance.interceptors.response.use(
+  (response) => {
+    return response;
+  },
   (error) => {
-    if (error.response?.status === 401) {
-      store.dispatch(logout())
+    console.error('API Error:', error.response?.data || error.message);
+    
+    if (error.response?.status === 401 || error.response?.data?.error?.name === 'Incorrect Password') {
+      console.log('Unauthorized: Redirecting to login...');
+      window.location.href = '/login';
     }
-    return Promise.reject(error)
-  }
-)
 
-export const authApi = {
-  login: (credentials: { email: string; password: string }) =>
-    api.post('/auth/login', credentials),
-  logout: () => api.post('/auth/logout')
-}
+    return Promise.reject(error);
+  }
+);
+
+export default axiosInstance;

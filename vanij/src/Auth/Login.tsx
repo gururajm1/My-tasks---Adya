@@ -3,10 +3,12 @@ import blurredImage from "../assets/blurredImage.png"
 import adyaLogo from '../assets/adyaLogo.png'
 import { ArrowRight, Lock, Eye, EyeOff, Mail } from "lucide-react"
 import { useDispatch } from 'react-redux'
-import login from '../store/slices/authSlice'
+import { verifyUserPassword } from '../store/slices/authSlice'
+import { useNavigate } from 'react-router-dom'
 
 const Login = () => {
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const [authMethod, setAuthMethod] = useState<'password' | 'otp'>('password')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -14,6 +16,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false)
   const [emailVerified, setEmailVerified] = useState(false)
   const [emailError, setEmailError] = useState('')
+  const [error, setError] = useState('')
   
   const validateEmail = (email: string) => {
     const gmailRegex = /@gmail\.com$/i
@@ -37,17 +40,28 @@ const Login = () => {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
+    setError('');
     try {
-      await dispatch(login({ email, password }))
-    } catch (error) {
-      console.error('Login failed:', error)
+      const loginData = {
+        id: 3145,
+        password: password,
+        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb21wYW55X2lkIjoyMDA0LCJlbWFpbCI6Im1vbmEwNjU0N0BnbWFpbC5jb20iLCJleHAiOjE3MzcwMjQ0MTcsImlkIjoyMDI2LCJtb2JpbGVfbnVtYmVyIjoiODc3ODg2NDM0NSIsInJvbGVzIjp7ImNvZGUiOiJURUFNX01FTUJFUiIsIm5hbWUiOiJURUFNX01FTUJFUiJ9fQ.FAFb8DgXAxo14-AdJS_KEl2fmjmSpTPTHUENRQiMrQk'
+      };
+      
+      const response = await dispatch(verifyUserPassword(loginData));
+      if (response.payload) {
+        localStorage.setItem('token', loginData.token);
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      setError(error.message || 'Login failed. Please try again.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
-  
+  };
   const handleBackToEmail = () => {
     setEmailVerified(false)
     setEmailError('')
@@ -85,8 +99,8 @@ const Login = () => {
       </div>
 
       {/* login content */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
-        <div className="max-w-md w-full">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 ">
+        <div className="max-w-md w-full  border-1 border-gray-200 p-10 rounded-4xl">
           {/* Mobile logo (visible only on small screens) */}
           <div className="flex justify-center mb-8 lg:hidden">
             <img src={adyaLogo} alt="Adya Logo" className="w-16 h-16 object-contain" />
@@ -98,13 +112,6 @@ const Login = () => {
             {emailVerified ? (
               <div className="flex items-center justify-center gap-2">
                 <p className="text-gray-500">Choose your preferred sign in method</p>
-                <button 
-                  type="button" 
-                  onClick={handleBackToEmail}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                >
-                  ({email})
-                </button>
               </div>
             ) : (
               <p className="text-gray-500">Enter your email to continue</p>
@@ -173,7 +180,7 @@ const Login = () => {
                   <p className="text-gray-600">
                     Click below to receive a verification code
                     <br />
-                    on d***r@adya.ai
+                    {email}
                   </p>
                 </div>
 
@@ -197,7 +204,7 @@ const Login = () => {
               disabled={loading}
               className="w-full py-4 bg-[#7CB9F8] hover:bg-blue-400 text-white rounded-[14px] flex items-center justify-center space-x-2"
             >
-              <span>{loading ? 'Verifying...' : 'Verify Code'}</span>
+              <span>{loading ? 'Signing in...' : 'Sign in'}</span>
               {!loading && <ArrowRight className="h-5 w-5" />}
             </button>
           </form>
