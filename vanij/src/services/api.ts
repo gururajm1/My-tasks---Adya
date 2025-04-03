@@ -7,13 +7,24 @@ const axiosInstance = axios.create({
   },
 });
 
-export const verifyPassword = async (id: number, password: string, token: string) => {
+export const verifyPassword = async (id: number, password: string) => {
   const response = await axiosInstance.post('/user/verify_password', {
     id,
     password
   }, {
     headers: {
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${import.meta.env.VITE_PASSWORD_AUTH_TOKEN}`
+    }
+  });
+  return response.data;
+};
+
+export const verifyEmail = async (email: string) => {
+  const response = await axiosInstance.post('/user/login', {
+    login: email
+  }, {
+    headers: {
+      Authorization: `Bearer ${import.meta.env.VITE_EMAIL_AUTH_TOKEN}`
     }
   });
   return response.data;

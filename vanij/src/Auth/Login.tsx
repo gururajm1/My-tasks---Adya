@@ -3,11 +3,13 @@ import blurredImage from "../assets/blurredImage.png"
 import adyaLogo from '../assets/adyaLogo.png'
 import { ArrowRight, Lock, Eye, EyeOff, Mail } from "lucide-react"
 import { useDispatch } from 'react-redux'
-import { verifyUserPassword, validateEmail as validateEmailAction } from '../store/slices/authSlice'
+import { verifyUserPassword, verifyUserEmail, validateEmail as validateEmailAction } from '../store/slices/authSlice'
 import { useNavigate } from 'react-router-dom'
+import { verifyEmail } from '../services/api'
+import type { AppDispatch } from '../store'
 
 const Login = () => {
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
   const [authMethod, setAuthMethod] = useState<'password' | 'otp'>('password')
   const [email, setEmail] = useState('')
@@ -57,23 +59,28 @@ const Login = () => {
     setLoading(true);
     setError('');
     try {
+      // Verify email first using the thunk
+      const emailResponse = await dispatch(verifyUserEmail(email));
+      if (emailResponse.meta.requestStatus !== 'fulfilled' || !emailResponse.payload.data.is_email_verified) {
+        setError('Email is not verified. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // If email is verified, proceed to verify password
       const loginData = {
         id: import.meta.env.VITE_USER_ID ? Number(import.meta.env.VITE_USER_ID) : 0,
-        password: password,
-        token: import.meta.env.VITE_AUTH_TOKEN || ''
+        password: password
       };
       
       const response = await dispatch(verifyUserPassword(loginData));
-      if (response.payload && !response.error) {
-        localStorage.setItem('token', loginData.token);
-        
+      if (response.meta.requestStatus === 'fulfilled' && response.payload.meta.status) {
+        localStorage.setItem('token', response.payload.data.token);
         window.dispatchEvent(new Event('authChange'));
-        
         await new Promise(resolve => setTimeout(resolve, 100));
-        
         navigate('/dashboard', { replace: true });
       } else {
-        setError('Invalid password. Please try again.');
+        setError('Invalid password or email verification failed. Please try again.');
         localStorage.removeItem('token');
         window.dispatchEvent(new Event('authChange'));
         navigate('/login', { replace: true });

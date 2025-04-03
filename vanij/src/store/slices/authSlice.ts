@@ -1,10 +1,10 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { verifyPassword } from '../../services/api';
+import { verifyPassword, verifyEmail } from '../../services/api';
 
 interface LoginCredentials {
   id: number;
   password: string;
-  token: string;
+  token?: string;
 }
 
 interface EmailValidationState {
@@ -17,10 +17,22 @@ export const verifyUserPassword = createAsyncThunk(
   'auth/verifyPassword',
   async ({ id, password, token }: LoginCredentials, { rejectWithValue }) => {
     try {
-      const response = await verifyPassword(id, password, token);
+      const response = await verifyPassword(id, password);
       return { ...response, token };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Verification failed');
+    }
+  }
+);
+
+export const verifyUserEmail = createAsyncThunk(
+  'auth/verifyEmail',
+  async (email: string, { rejectWithValue }) => {
+    try {
+      const response = await verifyEmail(email);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Email verification failed');
     }
   }
 );
@@ -32,7 +44,7 @@ const authSlice = createSlice({
   initialState: {
     user: null,
     loading: false,
-    error: null,
+    error: null as string | null,
     emailValidation: {
       isValid: false,
       email: '',
@@ -80,6 +92,20 @@ const authSlice = createSlice({
       .addCase(verifyUserPassword.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+      })
+      .addCase(verifyUserEmail.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(verifyUserEmail.fulfilled, (state, action) => {
+        state.loading = false;
+        state.emailValidation.isValid = true;
+        state.emailValidation.email = action.payload.email;
+      })
+      .addCase(verifyUserEmail.rejected, (state, action) => {
+        state.loading = false;
+        state.emailValidation.isValid = false;
+        state.emailValidation.error = action.payload as string;
       });
   },
 });
