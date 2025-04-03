@@ -12,6 +12,7 @@ const Login = () => {
   const [authMethod, setAuthMethod] = useState<'password' | 'otp'>('password')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [validLoginPassword, setValidLoginPassword] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [emailVerified, setEmailVerified] = useState(false)
@@ -22,6 +23,17 @@ const Login = () => {
    // const gmailRegex =
     return email
   }
+
+  const handlePasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newPassword = event.target.value;
+    setPassword(newPassword); 
+
+    if (newPassword.length >= 8) {
+      setValidLoginPassword(true); 
+    } else {
+      setValidLoginPassword(false); 
+    }
+  };
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -163,15 +175,15 @@ const Login = () => {
             {authMethod === 'password' ? (
               <>
                 <div className="space-y-4">
-                  <p className="text-sm text-center text-gray-600">Enter your account password</p>
+                  <p className="text-sm text-center text-gray-600">Enter your account password </p>
                   <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-12 py-4 border rounded-[14px] bg-gray-50 text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
+                  <input
+                    type={showPassword ? 'text' : 'password'} // Toggle between text and password
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={handlePasswordChange} // Handle password input change
+                    className="w-full px-12 py-4 border rounded-[14px] bg-gray-50 text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                       <Lock size={20} />
                     </div>
@@ -213,14 +225,17 @@ const Login = () => {
               </div>
             )}
 
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full py-4 bg-[#7CB9F8] hover:bg-blue-400 text-white rounded-[14px] flex items-center justify-center space-x-2"
-            >
-              <span>{loading ? 'Signing in...' : 'Sign in'}</span>
-              {!loading && <ArrowRight className="h-5 w-5" />}
-            </button>
+          <button 
+            type="submit" 
+            disabled={loading || !validLoginPassword}
+            className={`w-full py-4 text-white rounded-[14px] flex items-center justify-center space-x-2 ${
+              validLoginPassword ? "bg-blue-700 hover:bg-[#2563EB]" : "bg-[#7CB9F8]"
+            }`}
+          >
+            <span>{loading ? 'Signing in...' : 'Sign in'}</span>
+            {!loading && <ArrowRight className="h-5 w-5" />}
+          </button>
+
           </form>
           ) : (
             <form className="space-y-6" onSubmit={handleEmailSubmit}>
@@ -245,7 +260,7 @@ const Login = () => {
               
               <button 
                 type="submit" 
-                className="w-full py-4 bg-[#2563EB] hover:bg-blue-700 text-white rounded-[14px] flex items-center justify-center space-x-2"
+                className="w-full py-4 bg-blue-700 hover:bg-[#2563EB] text-white rounded-[14px] flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <span>Continue</span>
                 <ArrowRight className="h-5 w-5" />

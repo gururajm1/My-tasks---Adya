@@ -1,42 +1,26 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useState, useEffect } from "react";
 import Login from "./Auth/Login";
 import Dashboard from "./pages/Dashboard";
+import PrivateRoute from "./Routes/PrivateRoutes";  
+import PublicRoute from "./Routes/PublicRoutes";  
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
-  useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem("token");
-      setIsAuthenticated(!!token);
-    };
-    
-    checkAuth();
-    
-    window.addEventListener("storage", checkAuth);
-    window.addEventListener("authChange", checkAuth);
-    
-    return () => {
-      window.removeEventListener("storage", checkAuth);
-      window.removeEventListener("authChange", checkAuth);
-    };
-  }, []);
-
   return (
     <BrowserRouter>
       <Routes>
         {/* Public Route */}
-        <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
-        
+        <Route element={<PublicRoute />}>
+          <Route path="/login" element={<Login />} />
+        </Route>
+
         {/* Private Route */}
-        <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} />
-        
-        {/* Default redirect */}
-        <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
-        
-        {/* Catch routes */}
-        <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
+        <Route element={<PrivateRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Route>
+
+        {/* Default Route */}
+        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>
   );
