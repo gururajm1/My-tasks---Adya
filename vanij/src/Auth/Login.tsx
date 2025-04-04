@@ -3,15 +3,23 @@ import blurredImage from "../assets/blurredImage.png"
 import adyaLogo from '../assets/adyaLogo.png'
 import { ArrowRight, Lock, Eye, EyeOff, Mail } from "lucide-react"
 import { useDispatch } from 'react-redux'
-import { verifyUserPassword, verifyUserEmail, validateEmail as validateEmailAction } from '../store/slices/authSlice'
+import { verifyUserPassword, verifyUserEmail, validateEmail as validateEmailAction, setEmail, resendUserOtp, verifyUserOtp, validateOtp as validateOtpAction, setOtp } from '../store/slices/authSlice'
 import { useNavigate } from 'react-router-dom'
 import { verifyEmail } from '../services/api'
 import type { AppDispatch } from '../store'
+import { REGEXP_ONLY_DIGITS } from "input-otp"
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp"
+import { Button } from "@/components/ui/button"
 
 const Login = () => {
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
-  const [authMethod, setAuthMethod] = useState<'password' | 'otp'>('password')
+  const [authMethod, setAuthMethod] = useState<'password' | 'otp' | ''>('')
+  const [showCode, setShowCode] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [validLoginPassword, setValidLoginPassword] = useState(false)
@@ -20,10 +28,65 @@ const Login = () => {
   const [emailVerified, setEmailVerified] = useState(false)
   const [emailError, setEmailError] = useState('')
   const [error, setError] = useState('')
+  const [otp, sendOtp] = useState(false)
+  const [showOtpInput, setShowOtpInput] = useState(false)
+  const [otpValue, setOtpValue] = useState('')
+  const [showOtp, setShowOtp] = useState(false)
+  const [canResendOtp, setCanResendOtp] = useState(true)
+  const [resendTimer, setResendTimer] = useState(0)
+  const [isAtOtpPage, setIsAtOtpPage] = useState(false)
+  const [isForgotPassword, setIsForgotPassword] = useState(false)
+
+  useEffect(() => {
+  }, [authMethod])
   
   const validateEmail = (email: string) => {
    // const gmailRegex =
     return email
+  }
+
+  const handleSendOtp = async () => {
+    setShowOtpInput(true)
+    setCanResendOtp(false)
+    setResendTimer(59)
+    sendOtp(true)
+    setError('')
+    
+    try {
+      const response = await dispatch(resendUserOtp(email))
+      if (response.meta.requestStatus === 'fulfilled') {
+        console.log('OTP sent successfully')
+        if (response.payload?.data?.otp) {
+          setShowOtp(true)
+          console.log('OTP for testing:', response.payload.data.otp)
+        }
+      } else {
+        setError('Failed to send OTP. Please try again.')
+      }
+    } catch (error: any) {
+      console.error('Failed to send OTP:', error)
+      setError('Failed to send OTP. Please try again.')
+    }
+    
+    const timer = setInterval(() => {
+      setResendTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          setCanResendOtp(true)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  const handleOtpChange = (value: string) => {
+    setOtpValue(value)
+    if (value.length === 6) {
+      dispatch(validateOtpAction(value))
+      dispatch(setOtp(value))
+      console.log('OTP complete:', value)
+    }
   }
 
   const handlePasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,6 +101,8 @@ const Login = () => {
   };
 
   const handleEmailSubmit = (e: React.FormEvent) => {
+    setAuthMethod('password')
+    console.log('handleEmailSubmit called');
     e.preventDefault()
     if (!email.trim()) {
       setEmailError('Email is required')
@@ -52,6 +117,11 @@ const Login = () => {
     setEmailError('')
     dispatch(validateEmailAction(email))
     setEmailVerified(true)
+    dispatch({ 
+      type: 'auth/setEmail', 
+      payload: email 
+    })
+    localStorage.setItem('userEmail', email)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,7 +129,6 @@ const Login = () => {
     setLoading(true);
     setError('');
     try {
-      // Verify email first using the thunk
       const emailResponse = await dispatch(verifyUserEmail(email));
       if (emailResponse.meta.requestStatus !== 'fulfilled' || !emailResponse.payload.data.is_email_verified) {
         setError('Email is not verified. Please try again.');
@@ -67,30 +136,60 @@ const Login = () => {
         return;
       }
 
-      // If email is verified, proceed to verify password
-      const loginData = {
-        id: import.meta.env.VITE_USER_ID ? Number(import.meta.env.VITE_USER_ID) : 0,
-        password: password
-      };
-      
-      const response = await dispatch(verifyUserPassword(loginData));
-      if (response.meta.requestStatus === 'fulfilled' && response.payload.meta.status) {
-        localStorage.setItem('token', response.payload.data.token);
-        window.dispatchEvent(new Event('authChange'));
-        await new Promise(resolve => setTimeout(resolve, 100));
-        navigate('/dashboard', { replace: true });
-      } else {
-        setError('Invalid password or email verification failed. Please try again.');
-        localStorage.removeItem('token');
-        window.dispatchEvent(new Event('authChange'));
-        navigate('/login', { replace: true });
+      if (authMethod === 'password') {
+        const loginData = {
+          id: import.meta.env.VITE_USER_ID ? Number(import.meta.env.VITE_USER_ID) : 0,
+          password: password
+        };
+        
+        const response = await dispatch(verifyUserPassword(loginData));
+        if (response.meta.requestStatus === 'fulfilled' && response.payload.meta.status) {
+          localStorage.setItem('token', response.payload.data.token);
+          localStorage.setItem('userEmail', email);
+          dispatch({ 
+            type: 'auth/setEmail', 
+            payload: email 
+          });
+          window.dispatchEvent(new Event('authChange'));
+          await new Promise(resolve => setTimeout(resolve, 100));
+          navigate('/dashboard', { replace: true });
+        } else {
+          setError('Invalid password. Please try again.');
+          localStorage.removeItem('token');
+        }
+      } else if (authMethod === 'otp') {
+        if (!otpValue || otpValue.length !== 6) {
+          setError('Please enter a valid 6-digit OTP.');
+          setLoading(false);
+          return;
+        }
+        
+        const otpData = {
+          id: 3145,
+          otp: otpValue
+        };
+        
+        const response = await dispatch(verifyUserOtp(otpData));
+        if (response.meta.requestStatus === 'fulfilled' && response.payload.meta.status) {
+          localStorage.setItem('token', response.payload.data.token);
+          localStorage.setItem('userEmail', email);
+          dispatch({ 
+            type: 'auth/setEmail', 
+            payload: email 
+          });
+          window.dispatchEvent(new Event('authChange'));
+          await new Promise(resolve => setTimeout(resolve, 100));
+          navigate('/dashboard', { replace: true });
+        } else {
+          setError('Invalid OTP. Please try again.');
+          localStorage.removeItem('token');
+        }
       }
     } catch (error: any) {
       console.error('Login failed:', error);
       setError(error.message || 'Login failed. Please try again.');
       localStorage.removeItem('token');
       window.dispatchEvent(new Event('authChange'));
-      navigate('/login', { replace: true });
     } finally {
       setLoading(false);
     }
@@ -99,6 +198,11 @@ const Login = () => {
     setEmailVerified(false)
     setEmailError('')
   }
+
+  const handleForgotPassword = () => {
+    setIsForgotPassword(true)
+  }
+  
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
@@ -113,45 +217,55 @@ const Login = () => {
       >
         {/* Logo in top left */}
         <div>
-          <img src={adyaLogo} alt="Adya Logo" className="w-16 h-16 object-contain" />
+          <img src={adyaLogo} alt="Adya Logo" className="h-10 object-contain" />
         </div>
 
-        {/* Caption section */}
-        <div className="mb-12">
-          <div className="h-px w-12 bg-gray-400 mb-6"></div>
-          <p className="uppercase text-sm font-medium mb-4 text-gray-800">TRUSTED BY TEAMS</p>
-          <blockquote className="text-2xl font-medium text-gray-900 mb-6">
-            "Adya brings the best of AI technology and research, empowering enterprises to scale without vendor lock-in,
-            while retaining sovereignty over their AI."
-          </blockquote>
-          <div>
-            <p className="font-medium text-gray-900">Shayak Mazumder</p>
-            <p className="text-gray-700">Founder, Adya</p>
+        <div className="relative z-20 mt-auto max-w-xl space-y-8">
+          <div className="space-y-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-1 w-12 bg-gray-400 rounded-full"></div>
+                <p className="text-sm font-medium text-gray-700">TRUSTED BY TEAMS</p>
+              </div>
+              <p className="text-2xl font-light leading-relaxed text-gray-900">
+                "Adya brings the best of AI technology and research, empowering enterprises to scale without vendor lock-in, while retaining sovereignty over their AI."
+              </p>
+            </div>
+            <footer className="text-sm">
+              <div className="font-medium text-gray-900">Shayak Mazumder</div>
+              <div className="text-gray-600">Founder, Adya</div>
+            </footer>
           </div>
         </div>
       </div>
 
-      {/* login content */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 ">
-        <div className="max-w-md w-full  border-1 border-gray-200 p-10 rounded-4xl">
-          {/* Mobile logo (visible only on small screens) */}
-          <div className="flex justify-center mb-8 lg:hidden">
-            <img src={adyaLogo} alt="Adya Logo" className="w-16 h-16 object-contain" />
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+        <div className="w-full max-w-md mx-auto space-y-8 px-4">
+        <div className=" border-1 border-gray-300 p-7 rounded-4xl">
+          <div className="flex justify-center lg:hidden">
+            
+            {authMethod === 'password' || authMethod === 'otp' ? '' : <img src={adyaLogo} alt="Adya Logo" className="h-16 object-contain" />}
           </div>
 
-          <div className="text-center mb-8">
-            <img src={adyaLogo} alt="Adya Logo" className="w-12 h-12 mx-auto mb-4 hidden lg:block object-contain" />
-            <h1 className="text-3xl font-bold mb-2">Sign in to your account</h1>
-            {emailVerified ? (
-              <div className="flex items-center justify-center gap-2">
-                <p className="text-gray-500">Choose your preferred sign in method</p>
-              </div>
-            ) : (
-              <p className="text-gray-500">Enter your email to continue</p>
-            )}
-          </div>
+          <div className="text-center space-y-2">
+          {authMethod === 'password' || authMethod === 'otp' ? '' : <img src={adyaLogo} alt="Adya Logo" className="h-16 mx-auto hidden lg:block object-contain" />}
+            
+          {!isForgotPassword && (
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight pb-4">
+              {authMethod === 'otp' || authMethod === 'password' 
+                ? "Sign in to your account" 
+                : "Welcome to Adya"}
+            </h1>
 
-          {emailVerified && (
+            <p className="text-[15px] text-muted-foreground pb-4">
+              {emailVerified ? "Choose your preferred sign in method" : "Enter your email to sign in to your account"}
+            </p>
+          </div>
+          )}
+        </div>
+
+          {emailVerified && !isForgotPassword && (
             <div className="flex gap-2 p-1 bg-gray-100 rounded-lg mb-6">
               <button
                 type="button"
@@ -176,7 +290,31 @@ const Login = () => {
             </div>
           )}
 
-          {emailVerified ? (
+          {isForgotPassword ? (
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <h1 className="text-3xl font-semibold tracking-tight">Reset Password</h1>
+                <p className="text-[15px] text-muted-foreground">
+                  We'll send a verification code to
+                </p>
+                <p className="text-[15px] font-medium">
+                  {email}
+                </p>
+                <p className="text-[15px] text-muted-foreground mt-4">
+                  Use this code to verify your identity and set a new password
+                </p>
+              </div>
+              
+              <Button 
+                type="button"
+                className="w-full py-7 px-9 bg-blue-600 hover:bg-blue-800 text-white rounded-[14px] flex items-center justify-center space-x-2 cursor-pointer"
+                onClick={handleSendOtp}
+              >
+                <span>Send Verification Code</span>
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </div>
+          ) : emailVerified ? (
             <form className="space-y-6" onSubmit={handleSubmit}>
           
             {authMethod === 'password' ? (
@@ -185,10 +323,10 @@ const Login = () => {
                   <p className="text-sm text-center text-gray-600">Enter your account password </p>
                   <div className="relative">
                   <input
-                    type={showPassword ? 'text' : 'password'} // Toggle between text and password
+                    type={showPassword ? 'text' : 'password'} 
                     placeholder="Enter your password"
                     value={password}
-                    onChange={handlePasswordChange} // Handle password input change
+                    onChange={handlePasswordChange}
                     className="w-full px-12 py-4 border rounded-[14px] bg-gray-50 text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -202,44 +340,124 @@ const Login = () => {
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                   </div>
-                  <div className="flex justify-end">
-                    <a href="#" className="text-sm text-blue-600 hover:text-blue-800">Forgot Password?</a>
+                  <div className={`${error ? 'flex justify-between' : 'flex justify-end'}`}>
+                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                    <button 
+                      type="button" 
+                      onClick={handleForgotPassword}
+                      className="text-sm text-blue-600 hover:text-blue-800 bg-transparent border-none cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
                   </div>
                 </div>
               </>
             ) : (
               <div className="space-y-6">
+              {!isAtOtpPage ?
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
                   <p className="text-gray-600">
-                    Click below to receive a verification code
+                    {showOtpInput ? 'Enter the verification code sent to' : 'Click below to receive a verification code'}
+                    <br />
+                    {email}
+                  </p>
+                  <br/>
+                  <Button 
+                    type="button"
+                    className="py-7 px-5 rounded-md text-black hover:bg-[#f4f4f5] hover:text-black text-sm cursor-pointer bg-white"
+                    onClick={() => {
+                      setIsAtOtpPage(true);
+                      handleSendOtp();
+                    }}                    
+                  >Request OTP</Button>
+                </div>
+                : 
+                <div className="p-2 text-center">
+                  <p className="text-gray-600">
+                    {showOtpInput ? 'Enter the verification code sent to' : 'Click below to receive a verification code'}
                     <br />
                     {email}
                   </p>
                 </div>
+              }
 
-                <div className="flex justify-center">
-                  <button 
+                {showOtpInput && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center space-y-2">
+                      <InputOTP
+                        value={otpValue}
+                        onChange={handleOtpChange}
+                        maxLength={6}
+                        pattern={REGEXP_ONLY_DIGITS}
+                      >
+                        <InputOTPGroup className="gap-2">
+                          <InputOTPSlot index={0} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white"/>
+                          <InputOTPSlot index={1} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
+                          <InputOTPSlot index={2} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
+                          <InputOTPSlot index={3} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
+                          <InputOTPSlot index={4} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
+                          <InputOTPSlot index={5} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                  </div>
+                )}
+              {isAtOtpPage ? 
+                <div className="flex justify-between">
+                  {/* <button 
                     type="button" 
-                    className="border border-gray-200 hover:bg-gray-50 py-2 px-4 rounded-md flex items-center gap-2"
+                    className={`border border-gray-200 py-2 px-4 rounded-md flex items-center gap-2 ${canResendOtp ? 'hover:bg-gray-50 cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+                    onClick={handleSendOtp}
+                    disabled={!canResendOtp}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect width="20" height="16" x="2" y="4" rx="2" />
                       <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                     </svg>
-                    Request OTP
-                  </button>
+                    {canResendOtp ? 'Request OTP' : `Resend in ${resendTimer}s`}
+                  </button> */}
+
+                  <Button  
+                    type="button"
+                    className="h-9 px-3 rounded-md text-gray-500 bg-transparent hover:bg-[#f4f4f5] hover:text-black text-sm cursor-pointer"
+                    onClick={handleSendOtp}
+                    disabled={!canResendOtp}>
+                      {canResendOtp ? 'Resend Code' : `Resend in ${resendTimer}s`}
+                  </Button>
+                  {/* <Button
+                    type="button"
+                    className="h-9 px-3 rounded-md text-gray-500 bg-transparent hover:bg-[#f4f4f5] hover:text-black text-sm cursor-pointer"
+                    onClick={() => setShowCode(!showCode)}
+                  >
+                    {showCode ? 'Show Code' : 'Hide Code'}
+                </Button> */}
+
                 </div>
+                : ''
+              }
               </div>
             )}
 
           <button 
             type="submit" 
-            disabled={loading || !validLoginPassword}
+            disabled={loading || (authMethod === 'password' && !validLoginPassword) || (authMethod === 'otp' && otpValue.length !== 6)}
             className={`w-full py-4 text-white rounded-[14px] flex items-center justify-center space-x-2 ${
-              validLoginPassword ? "bg-blue-700 hover:bg-[#2563EB]" : "bg-[#7CB9F8]"
+              (authMethod === 'password' && validLoginPassword) || (authMethod === 'otp' && otpValue.length === 6) 
+              ? "bg-blue-700 hover:bg-[#2563EB] cursor-pointer" 
+              : "bg-[#7CB9F8]"
             }`}
           >
-            <span>{loading ? 'Signing in...' : 'Sign in'}</span>
+            <span>
+              {authMethod === 'password'
+                ? loading
+                  ? 'Signing in...'
+                  : 'Sign in'
+                : authMethod === 'otp'
+                ? loading
+                  ? 'Verifying...'
+                  : 'Verify code'
+                : 'Sign in'}
+            </span>
             {!loading && <ArrowRight className="h-5 w-5" />}
           </button>
 
@@ -266,7 +484,7 @@ const Login = () => {
               </div>
               
               <button 
-                type="submit" 
+                type="submit"            
                 className="w-full py-4 bg-blue-700 hover:bg-[#2563EB] text-white rounded-[14px] flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <span>Continue</span>
@@ -274,7 +492,7 @@ const Login = () => {
               </button>
             </form>
           )}
-
+        </div>
           <div className="mt-8 text-center text-sm text-gray-500">
             <p>By continuing, you agree to our</p>
             <div className="flex justify-center items-center mt-2 space-x-4">

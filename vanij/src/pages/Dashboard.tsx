@@ -1,14 +1,33 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
+import { RootState } from '../store'
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const email = useSelector((state:any) => state.auth.emailValidation.email)
+  const dispatch = useDispatch();
+  const email = useSelector((state: any) => state.auth.emailValidation.email);
+
+  console.log('Email from Redux:', email);
+
+  // Ensure we use email from localStorage as fallback
+  useEffect(() => {
+    if (!email) {
+      // If needed, you can dispatch an action to set the email from localStorage here
+      const savedEmail = localStorage.getItem('userEmail');
+      if (savedEmail) {
+        dispatch({ 
+          type: 'auth/setEmail', 
+          payload: savedEmail 
+        });
+      }
+    }
+  }, [email, dispatch]);
 
   const handleLogout = () => {
     localStorage.removeItem('token')
+    localStorage.removeItem('userEmail')
     navigate('/login');
   }
   return (

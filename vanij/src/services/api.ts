@@ -30,6 +30,30 @@ export const verifyEmail = async (email: string) => {
   return response.data;
 };
 
+export const resendOtp = async (email: string) => {
+  const response = await axiosInstance.post('/user/resend_otp', {
+    id: 3145
+  }, {
+    headers: {
+      Authorization: `Bearer ${import.meta.env.VITE_EMAIL_AUTH_TOKEN}`
+    }
+  });
+  console.log('OTP from API:', response.data.data.otp); // Log the OTP to console
+  return response.data;
+};
+
+export const verifyOtp = async (email: string, otp: string) => {
+  const response = await axiosInstance.post('/user/verify_otp', {
+    id: 3145,
+    otp: otp
+  }, {
+    headers: {
+      Authorization: `Bearer ${import.meta.env.VITE_EMAIL_AUTH_TOKEN}`
+    }
+  });
+  return response.data;
+};
+
 // interceptor
 axiosInstance.interceptors.request.use(
   (config) => {

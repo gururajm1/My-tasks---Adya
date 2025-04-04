@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { verifyPassword, verifyEmail } from '../../services/api';
+import { verifyPassword, verifyEmail, resendOtp, verifyOtp } from '../../services/api';
 
 interface LoginCredentials {
   id: number;
@@ -10,6 +10,12 @@ interface LoginCredentials {
 interface EmailValidationState {
   isValid: boolean;
   email: string;
+  error: string | null;
+}
+
+interface OtpValidationState {
+  isValid: boolean;
+  otp: string;
   error: string | null;
 }
 
@@ -37,6 +43,32 @@ export const verifyUserEmail = createAsyncThunk(
   }
 );
 
+export const resendUserOtp = createAsyncThunk(
+  'auth/resendOtp',
+  async (email: string, { rejectWithValue }) => {
+    try {
+      const response = await resendOtp(email);
+      console.log('OTP Response:', response);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'OTP resend failed');
+    }
+  }
+);
+
+export const verifyUserOtp = createAsyncThunk(
+  'auth/verifyOtp',
+  async ({ id, otp }: { id: number, otp: string }, { rejectWithValue }) => {
+    try {
+      const email = ''; //dummy just for placeholder
+      const response = await verifyOtp(email, otp);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'OTP verification failed');
+    }
+  }
+);
+
 // const EMAIL_REGEX = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const authSlice = createSlice({
@@ -49,7 +81,12 @@ const authSlice = createSlice({
       isValid: false,
       email: '',
       error: null
-    } as EmailValidationState
+    } as EmailValidationState,
+    otpValidation: {
+      isValid: false,
+      otp: '',
+      error: null
+    } as OtpValidationState
   },
   reducers: {
     validateEmail: (state, action) => {
@@ -77,7 +114,39 @@ const authSlice = createSlice({
         email: '',
         error: null
       };
-    }
+    },
+    setEmail: (state, action) => {
+      state.emailValidation.email = action.payload;
+    },
+    validateOtp: (state, action) => {
+      const otp = action.payload;
+      state.otpValidation.otp = otp;
+      
+      if (!otp) {
+        state.otpValidation.isValid = false;
+        state.otpValidation.error = 'OTP is required';
+        return;
+      }
+
+      if (otp.length !== 6 || !/^\d+$/.test(otp)) {
+        state.otpValidation.isValid = false;
+        state.otpValidation.error = 'Invalid OTP format';
+        return;
+      }
+
+      state.otpValidation.isValid = true;
+      state.otpValidation.error = null;
+    },
+    resetOtpValidation: (state) => {
+      state.otpValidation = {
+        isValid: false,
+        otp: '',
+        error: null
+      };
+    },
+    setOtp: (state, action) => {
+      state.otpValidation.otp = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -106,13 +175,40 @@ const authSlice = createSlice({
         state.loading = false;
         state.emailValidation.isValid = false;
         state.emailValidation.error = action.payload as string;
+      })
+      .addCase(resendUserOtp.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(resendUserOtp.fulfilled, (state, action) => {
+        state.loading = false;
+        // The OTP is logged to console in the API service
+      })
+      .addCase(resendUserOtp.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(verifyUserOtp.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(verifyUserOtp.fulfilled, (state, action) => {
+        state.loading = false;
+        state.otpValidation.isValid = true;
+        state.user = action.payload;
+      })
+      .addCase(verifyUserOtp.rejected, (state, action) => {
+        state.loading = false;
+        state.otpValidation.isValid = false;
+        state.otpValidation.error = action.payload as string;
       });
   },
 });
 
-export const { validateEmail, resetEmailValidation } = authSlice.actions;
+export const { validateEmail, resetEmailValidation, setEmail, validateOtp, resetOtpValidation, setOtp } = authSlice.actions;
 
 // Selectors
 export const selectEmailValidation = (state: { auth: { emailValidation: EmailValidationState } }) => state.auth.emailValidation;
+export const selectOtpValidation = (state: { auth: { otpValidation: OtpValidationState } }) => state.auth.otpValidation;
 
 export default authSlice.reducer;
