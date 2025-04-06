@@ -1,19 +1,15 @@
 import { useState, useEffect } from "react"
 import blurredImage from "../assets/blurredImage.png" 
 import adyaLogo from '../assets/adyaLogo.png'
+import OtpContainer from "@/components/OtpContainer"
 import { ArrowRight, Lock, Eye, EyeOff, Mail } from "lucide-react"
 import { useDispatch } from 'react-redux'
 import { verifyUserPassword, verifyUserEmail, validateEmail as validateEmailAction, setEmail, resendUserOtp, verifyUserOtp, validateOtp as validateOtpAction, setOtp } from '../store/slices/authSlice'
 import { useNavigate } from 'react-router-dom'
 import { verifyEmail } from '../services/api'
 import type { AppDispatch } from '../store'
-import { REGEXP_ONLY_DIGITS } from "input-otp"
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "@/components/ui/input-otp"
 import { Button } from "@/components/ui/button"
+import TogglePasswordOtp from "@/components/TogglePasswordOtp"
 
 const Login = () => {
   const dispatch = useDispatch<AppDispatch>()
@@ -36,6 +32,7 @@ const Login = () => {
   const [resendTimer, setResendTimer] = useState(0)
   const [isAtOtpPage, setIsAtOtpPage] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
+  const [isAtForgotPasswordOtpPage, setIsAtForgotPasswordOtpPage] = useState(false)
 
   useEffect(() => {
   }, [authMethod])
@@ -201,6 +198,7 @@ const Login = () => {
 
   const handleForgotPassword = () => {
     setIsForgotPassword(true)
+    //setAuthMethod('otp')
   }
   
 
@@ -253,66 +251,87 @@ const Login = () => {
           {!isForgotPassword && (
           <div>
             <h1 className="text-3xl font-semibold tracking-tight pb-4">
-              {authMethod === 'otp' || authMethod === 'password' 
-                ? "Sign in to your account" 
-                : "Welcome to Adya"}
+            {authMethod === 'otp' || authMethod === 'password'
+              ? "Sign in to your account"
+              : "Welcome to Adya"}
             </h1>
 
             <p className="text-[15px] text-muted-foreground pb-4">
-              {emailVerified ? "Choose your preferred sign in method" : "Enter your email to sign in to your account"}
+              {!isForgotPassword ? emailVerified ? "Choose your preferred sign in method" : "Enter your email to sign in to your account" : '' }
+              {/* {emailVerified ? "Choose your preferred sign in method" : "Enter your email to sign in to your account"} */}
             </p>
           </div>
           )}
         </div>
 
-          {emailVerified && !isForgotPassword && (
-            <div className="flex gap-2 p-1 bg-gray-100 rounded-lg mb-6">
-              <button
-                type="button"
-                className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 ${authMethod === 'password' ? 'bg-white shadow-sm' : ''}`}
-                onClick={() => setAuthMethod('password')}
-              >
-                <Lock size={16} />
-                <span>Password</span>
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 ${authMethod === 'otp' ? 'bg-white shadow-sm' : ''}`}
-                onClick={() => setAuthMethod('otp')}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 7L2 7" />
-                  <path d="M17 7V4C17 3.46957 16.7893 2.96086 16.4142 2.58579C16.0391 2.21071 15.5304 2 15 2H9C8.46957 2 7.96086 2.21071 7.58579 2.58579C7.21071 2.96086 7 3.46957 7 4V7" />
-                  <path d="M12 12L12 19" />
-                </svg>
-                <span>OTP</span>
-              </button>
-            </div>
-          )}
+          {emailVerified && !isForgotPassword || emailVerified && !isAtForgotPasswordOtpPage && !isForgotPassword ? (
+            <TogglePasswordOtp
+            setAuthMethod={setAuthMethod}
+            authMethod={authMethod}
+            password={"password"}
+          />
+          ) : ""}
 
           {isForgotPassword ? (
             <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight">Reset Password</h1>
-                <p className="text-[15px] text-muted-foreground">
-                  We'll send a verification code to
-                </p>
-                <p className="text-[15px] font-medium">
-                  {email}
-                </p>
-                <p className="text-[15px] text-muted-foreground mt-4">
-                  Use this code to verify your identity and set a new password
-                </p>
-              </div>
-              
-              <Button 
-                type="button"
-                className="w-full py-7 px-9 bg-blue-600 hover:bg-blue-800 text-white rounded-[14px] flex items-center justify-center space-x-2 cursor-pointer"
-                onClick={handleSendOtp}
-              >
-                <span>Send Verification Code</span>
-                <ArrowRight className="h-5 w-5" />
-              </Button>
+              {!showOtpInput ? (
+                <>
+                  <div className="text-center space-y-2">
+                    <h1 className="text-3xl font-semibold tracking-tight">Reset Password</h1>
+                    <p className="text-[15px] text-muted-foreground">
+                      We'll send a verification code to
+                    </p>
+                    <p className="text-sm text-center text-gray-600">
+                      {email}
+                    </p>
+                    <p className="text-[15px] text-muted-foreground mt-4">
+                      Use this code to verify your identity and set a new password
+                    </p>
+                  </div>
+                  
+                  <Button 
+                    type="button"
+                    className=" hover:bg-blue-800"
+                    onClick={() => {
+                      setIsAtForgotPasswordOtpPage(true);
+                      handleSendOtp();
+                    }}
+                  >
+                    <span>Send Verification Code</span>
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {isAtForgotPasswordOtpPage && (
+                    <div className="text-center space-y-2">
+                      <h1 className="text-3xl font-semibold tracking-tight"></h1>
+                      <p className="text-[15px] text-muted-foreground"></p>
+                      <p className="text-[15px] font-medium"></p>
+                    </div>
+                  )}
+                  
+                  <OtpContainer 
+                    otpValue={otpValue}
+                    handleOtpChange={handleOtpChange}
+                    title="Verification"
+                    description="Enter the verification code sent to"
+                    email={email}
+                    showResendButton={true}
+                    canResendOtp={canResendOtp}
+                    resendTimer={resendTimer}
+                    handleResendOtp={handleSendOtp}
+                    showVerifyButton={true}
+                    verifyButtonText="Verify & Continue"
+                    loading={loading}
+                    error={error}
+                    handleVerifyOtp={() => {
+                      // Handle verification logic here
+                      console.log('Verifying OTP for password reset:', otpValue);
+                    }}
+                  />
+                </>
+              )}
             </div>
           ) : emailVerified ? (
             <form className="space-y-6" onSubmit={handleSubmit}>
@@ -320,7 +339,11 @@ const Login = () => {
             {authMethod === 'password' ? (
               <>
                 <div className="space-y-4">
+                  <div>
                   <p className="text-sm text-center text-gray-600">Enter your account password </p>
+                  <p className="text-sm text-center text-gray-600">{email}</p>
+                  </div>
+                  
                   <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'} 
@@ -354,9 +377,9 @@ const Login = () => {
               </>
             ) : (
               <div className="space-y-6">
-              {!isAtOtpPage ?
+              {!isAtOtpPage ? (
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <p className="text-gray-600">
+                  <p className="text-sm text-center text-gray-600">
                     {showOtpInput ? 'Enter the verification code sent to' : 'Click below to receive a verification code'}
                     <br />
                     {email}
@@ -371,7 +394,7 @@ const Login = () => {
                     }}                    
                   >Request OTP</Button>
                 </div>
-                : 
+              ) : (
                 <div className="p-2 text-center">
                   <p className="text-gray-600">
                     {showOtpInput ? 'Enter the verification code sent to' : 'Click below to receive a verification code'}
@@ -379,69 +402,30 @@ const Login = () => {
                     {email}
                   </p>
                 </div>
-              }
+              )}
 
                 {showOtpInput && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center space-y-2">
-                      <InputOTP
-                        value={otpValue}
-                        onChange={handleOtpChange}
-                        maxLength={6}
-                        pattern={REGEXP_ONLY_DIGITS}
-                      >
-                        <InputOTPGroup className="gap-2">
-                          <InputOTPSlot index={0} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white"/>
-                          <InputOTPSlot index={1} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
-                          <InputOTPSlot index={2} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
-                          <InputOTPSlot index={3} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
-                          <InputOTPSlot index={4} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
-                          <InputOTPSlot index={5} className="rounded-md border-gray-200 p-6 rounded-2xl bg-white" />
-                        </InputOTPGroup>
-                      </InputOTP>
-                    </div>
-                  </div>
+                  <OtpContainer 
+                    otpValue={otpValue}
+                    handleOtpChange={handleOtpChange}
+                    title={""}
+                    description={""}
+                    email={""}
+                    showResendButton={isAtOtpPage}
+                    canResendOtp={canResendOtp}
+                    resendTimer={resendTimer}
+                    handleResendOtp={handleSendOtp}
+                    error={error}
+                  />
                 )}
-              {isAtOtpPage ? 
-                <div className="flex justify-between">
-                  {/* <button 
-                    type="button" 
-                    className={`border border-gray-200 py-2 px-4 rounded-md flex items-center gap-2 ${canResendOtp ? 'hover:bg-gray-50 cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
-                    onClick={handleSendOtp}
-                    disabled={!canResendOtp}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect width="20" height="16" x="2" y="4" rx="2" />
-                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                    </svg>
-                    {canResendOtp ? 'Request OTP' : `Resend in ${resendTimer}s`}
-                  </button> */}
 
-                  <Button  
-                    type="button"
-                    className="h-9 px-3 rounded-md text-gray-500 bg-transparent hover:bg-[#f4f4f5] hover:text-black text-sm cursor-pointer"
-                    onClick={handleSendOtp}
-                    disabled={!canResendOtp}>
-                      {canResendOtp ? 'Resend Code' : `Resend in ${resendTimer}s`}
-                  </Button>
-                  {/* <Button
-                    type="button"
-                    className="h-9 px-3 rounded-md text-gray-500 bg-transparent hover:bg-[#f4f4f5] hover:text-black text-sm cursor-pointer"
-                    onClick={() => setShowCode(!showCode)}
-                  >
-                    {showCode ? 'Show Code' : 'Hide Code'}
-                </Button> */}
-
-                </div>
-                : ''
-              }
               </div>
             )}
 
-          <button 
+          <Button 
             type="submit" 
             disabled={loading || (authMethod === 'password' && !validLoginPassword) || (authMethod === 'otp' && otpValue.length !== 6)}
-            className={`w-full py-4 text-white rounded-[14px] flex items-center justify-center space-x-2 ${
+            className={`${
               (authMethod === 'password' && validLoginPassword) || (authMethod === 'otp' && otpValue.length === 6) 
               ? "bg-blue-700 hover:bg-[#2563EB] cursor-pointer" 
               : "bg-[#7CB9F8]"
@@ -459,8 +443,8 @@ const Login = () => {
                 : 'Sign in'}
             </span>
             {!loading && <ArrowRight className="h-5 w-5" />}
-          </button>
-
+          </Button>
+          
           </form>
           ) : (
             <form className="space-y-6" onSubmit={handleEmailSubmit}>
@@ -483,13 +467,17 @@ const Login = () => {
                 {emailError && <p className="text-red-500 text-sm">{emailError}</p>}
               </div>
               
-              <button 
+              {/* <button 
                 type="submit"            
                 className="w-full py-4 bg-blue-700 hover:bg-[#2563EB] text-white rounded-[14px] flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <span>Continue</span>
-                <ArrowRight className="h-5 w-5" />
-              </button>
+                
+              </button> */}
+              <Button type="submit"   >
+                  Continue
+              <ArrowRight className="h-5 w-5" />
+              </Button>
             </form>
           )}
         </div>
