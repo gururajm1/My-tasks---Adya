@@ -4,7 +4,7 @@ import adyaLogo from '../assets/adyaLogo.png'
 import OtpContainer from "@/components/OtpContainer"
 import { ArrowRight, Lock, Eye, EyeOff, Mail } from "lucide-react"
 import { useDispatch } from 'react-redux'
-import { verifyUserPassword, verifyUserEmail, validateEmail as validateEmailAction, setEmail, resendUserOtp, verifyUserOtp, validateOtp as validateOtpAction, setOtp } from '../store/slices/authSlice'
+import { verifyUserPassword, verifyUserEmail, validateEmail as validateEmailAction, setEmail, resendUserOtp, verifyUserOtp, validateOtp as validateOtpAction, setOtp, changeUserPassword } from '../store/slices/authSlice'
 import { useNavigate } from 'react-router-dom'
 import { verifyEmail } from '../services/api'
 import type { AppDispatch } from '../store'
@@ -33,6 +33,17 @@ const Login = () => {
   const [isAtOtpPage, setIsAtOtpPage] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [isAtForgotPasswordOtpPage, setIsAtForgotPasswordOtpPage] = useState(false)
+  const [isPasswordResetPage, setIsPasswordResetPage] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordRequirements, setPasswordRequirements] = useState({
+    length: false,
+    uppercase: false,
+    number: false
+  })
 
   useEffect(() => {
   }, [authMethod])
@@ -84,6 +95,30 @@ const Login = () => {
       dispatch(setOtp(value))
       console.log('OTP complete:', value)
     }
+  }
+
+  const validatePasswordRequirements = (password: string) => {
+    const hasLength = password.length >= 8
+    const hasUppercase = /[A-Z]/.test(password)
+    const hasNumber = /[0-9]/.test(password)
+    
+    setPasswordRequirements({
+      length: hasLength,
+      uppercase: hasUppercase,
+      number: hasNumber
+    })
+    
+    return hasLength && hasUppercase && hasNumber
+  }
+
+  const handleNewPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const password = e.target.value
+    setNewPassword(password)
+    validatePasswordRequirements(password)
+  }
+
+  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setConfirmPassword(e.target.value)
   }
 
   const handlePasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,8 +235,60 @@ const Login = () => {
     setIsForgotPassword(true)
     //setAuthMethod('otp')
   }
-  
 
+  
+  const handleUpdatePassword = async () => {
+    // Client-side validation first
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+    
+    if (!validatePasswordRequirements(newPassword)) {
+      setPasswordError('Password does not meet requirements');
+      return;
+    }
+    
+    setLoading(true);
+    setPasswordError('');
+    
+    try {
+      // Use the parameter name expected by the Redux action (confirmPassword)
+      const passwordData = {
+        id: import.meta.env.VITE_USER_ID ? Number(import.meta.env.VITE_USER_ID) : 3145,
+        password: newPassword,
+        confirmPassword: confirmPassword
+      };
+      
+      console.log('Updating password with data:', passwordData);
+      
+      const response = await dispatch(changeUserPassword(passwordData));
+      console.log('Password update response:', response);
+      
+      if (response.meta.requestStatus === 'fulfilled' && response.payload.meta.status) {
+        // Password updated successfully
+        localStorage.setItem('token', response.payload.data.token);
+        window.dispatchEvent(new Event('authChange'));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        navigate('/dashboard', { replace: true });
+      } else {
+        const errorMessage = response.payload?.meta?.message || 
+                            response.payload?.error?.name || 
+                            'Failed to update password. Please try again.';
+        setPasswordError(errorMessage);
+      }
+    } catch (error: any) {
+      console.error('Password update failed:', error);
+      const errorMessage = error.response?.data?.meta?.message || 
+                           error.response?.data?.error?.name ||
+                           error.message || 
+                           'Failed to update password. Please try again.';
+      setPasswordError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <div className="flex h-screen w-full overflow-hidden">
       {/* background */}
@@ -301,6 +388,103 @@ const Login = () => {
                     <ArrowRight className="h-5 w-5" />
                   </Button>
                 </>
+              ) : isPasswordResetPage ? (
+                <div className="space-y-6">
+                  <div className="text-center space-y-2">
+                    <h1 className="text-3xl font-semibold tracking-tight">Change Password</h1>
+                    <p className="text-[15px] text-muted-foreground">
+                      Enter your new password
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        placeholder="Enter new password"
+                        value={newPassword}
+                        onChange={handleNewPasswordChange}
+                        className="w-full px-12 py-4 border rounded-[14px] bg-gray-50 text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <Lock size={20} />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      >
+                        {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
+                    
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        placeholder="Confirm new password"
+                        value={confirmPassword}
+                        onChange={handleConfirmPasswordChange}
+                        className="w-full px-12 py-4 border rounded-[14px] bg-gray-50 text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <Lock size={20} />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      >
+                        {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <p className="text-gray-600">Password must:</p>
+                      <div className="flex items-center gap-2">
+                        <div className={`h-5 w-5 rounded-full flex items-center justify-center ${passwordRequirements.length ? 'bg-green-500 text-white' : 'border border-gray-300'}`}>
+                          {passwordRequirements.length && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-600">Be at least 8 characters long</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`h-5 w-5 rounded-full flex items-center justify-center ${passwordRequirements.uppercase ? 'bg-green-500 text-white' : 'border border-gray-300'}`}>
+                          {passwordRequirements.uppercase && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-600">Contain at least one uppercase letter</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`h-5 w-5 rounded-full flex items-center justify-center ${passwordRequirements.number ? 'bg-green-500 text-white' : 'border border-gray-300'}`}>
+                          {passwordRequirements.number && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-600">Contain at least one number</span>
+                      </div>
+                    </div>
+                    
+                    {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
+                  </div>
+                  
+                  <Button 
+                    type="button"
+                    disabled={!passwordRequirements.length || !passwordRequirements.uppercase || !passwordRequirements.number || !confirmPassword || newPassword !== confirmPassword || loading}
+                    className={`${passwordRequirements.length && passwordRequirements.uppercase && passwordRequirements.number && confirmPassword && newPassword === confirmPassword ? "bg-blue-500 hover:bg-blue-600" : "bg-[#7CB9F8]"}`}
+                    onClick={handleUpdatePassword}
+                  >
+                    <span>{loading ? 'Updating...' : 'Update Password'}</span>
+                    {!loading && <ArrowRight className="h-5 w-5" />}
+                  </Button>
+                </div>
               ) : (
                 <>
                   {isAtForgotPasswordOtpPage && (
@@ -317,7 +501,7 @@ const Login = () => {
                     title="Verification"
                     description="Enter the verification code sent to"
                     email={email}
-                    showResendButton={true}
+                    showResendButton={isAtForgotPasswordOtpPage}
                     canResendOtp={canResendOtp}
                     resendTimer={resendTimer}
                     handleResendOtp={handleSendOtp}
@@ -325,9 +509,30 @@ const Login = () => {
                     verifyButtonText="Verify & Continue"
                     loading={loading}
                     error={error}
-                    handleVerifyOtp={() => {
-                      // Handle verification logic here
+                    handleVerifyOtp={async () => {
                       console.log('Verifying OTP for password reset:', otpValue);
+                      setLoading(true);
+                      setError('');
+                      
+                      try {
+                        const otpData = {
+                          id: 3145,
+                          otp: otpValue
+                        };
+                        
+                        const response = await dispatch(verifyUserOtp(otpData));
+                        if (response.meta.requestStatus === 'fulfilled' && response.payload.meta.status) {
+                          setIsPasswordResetPage(true);
+                          setIsAtForgotPasswordOtpPage(false);
+                        } else {
+                          setError('Invalid OTP. Please try again.');
+                        }
+                      } catch (error: any) {
+                        console.error('OTP verification failed:', error);
+                        setError(error.message || 'OTP verification failed. Please try again.');
+                      } finally {
+                        setLoading(false);
+                      }
                     }}
                   />
                 </>
@@ -418,7 +623,6 @@ const Login = () => {
                     error={error}
                   />
                 )}
-
               </div>
             )}
 

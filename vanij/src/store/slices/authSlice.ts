@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { verifyPassword, verifyEmail, resendOtp, verifyOtp } from '../../services/api';
+import { verifyPassword, verifyEmail, resendOtp, verifyOtp, changePassword } from '../../services/api';
 
 interface LoginCredentials {
   id: number;
@@ -65,6 +65,18 @@ export const verifyUserOtp = createAsyncThunk(
       return response;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'OTP verification failed');
+    }
+  }
+);
+
+export const changeUserPassword = createAsyncThunk(
+  'auth/changePassword',
+  async ({ id, password, confirmPassword }: { id: number, password: string, confirmPassword: string }, { rejectWithValue }) => {
+    try {
+      const response = await changePassword(id, password, confirmPassword);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Password change failed');
     }
   }
 );
@@ -198,6 +210,18 @@ const authSlice = createSlice({
         state.user = action.payload;
       })
       .addCase(verifyUserOtp.rejected, (state, action) => {
+        state.loading = false;
+        state.otpValidation.isValid = false;
+        state.otpValidation.error = action.payload as string;
+      })
+      .addCase(changeUserPassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(changeUserPassword.fulfilled, (state, action) => {
+        state.loading = false;
+      })
+      .addCase(changeUserPassword.rejected, (state, action) => {
         state.loading = false;
         state.otpValidation.isValid = false;
         state.otpValidation.error = action.payload as string;

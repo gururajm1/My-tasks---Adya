@@ -54,6 +54,19 @@ export const verifyOtp = async (email: string, otp: string) => {
   return response.data;
 };
 
+export const changePassword = async (id: number, password: string, confirmPassword: string) => {
+  const response = await axiosInstance.post('/user/change_password', {
+    id,
+    password,
+    confirm_password: confirmPassword
+  }, {
+    headers: {
+      Authorization: `Bearer ${import.meta.env.VITE_EMAIL_AUTH_TOKEN}`
+    }
+  });
+  return response.data;
+};
+
 // interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
