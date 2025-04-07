@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import blurredImage from "../assets/blurredImage.png" 
 import adyaLogo from '../assets/adyaLogo.png'
 import OtpContainer from "@/components/OtpContainer"
-import { ArrowRight, Lock, Eye, EyeOff, Mail } from "lucide-react"
+import { ArrowRight, ArrowLeft, Lock, Eye, EyeOff, Mail } from "lucide-react"
 import { useDispatch } from 'react-redux'
 import { verifyUserPassword, verifyUserEmail, validateEmail as validateEmailAction, setEmail, resendUserOtp, verifyUserOtp, validateOtp as validateOtpAction, setOtp, changeUserPassword } from '../store/slices/authSlice'
 import { useNavigate } from 'react-router-dom'
@@ -45,6 +45,14 @@ const Login = () => {
     number: false
   })
 
+  useEffect(() => {
+    // Check if user is already authenticated
+    const token = localStorage.getItem('token')
+    if (token) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [])
+  
   useEffect(() => {
   }, [authMethod])
   
@@ -213,7 +221,9 @@ const Login = () => {
           await new Promise(resolve => setTimeout(resolve, 100));
           navigate('/dashboard', { replace: true });
         } else {
-          setError('Invalid OTP. Please try again.');
+          // Set the error message directly from the rejected action
+          setError(response.payload || 'Invalid OTP. Please try again.');
+          console.log('OTP verification failed:', response.payload);
           localStorage.removeItem('token');
         }
       }
@@ -230,6 +240,31 @@ const Login = () => {
     setEmailVerified(false)
     setEmailError('')
   }
+  
+  const handleBackButton = () => {
+    // Clear all error states
+    setEmailError('');
+    setError('');
+    setPasswordError('');
+  
+    if (isPasswordResetPage) {
+      setIsPasswordResetPage(false);
+      setIsAtForgotPasswordOtpPage(true);
+    } else if (isAtForgotPasswordOtpPage) {
+      setIsAtForgotPasswordOtpPage(false);
+      setShowOtpInput(false);
+      setIsForgotPassword(true);
+    } else if (isForgotPassword) {
+      setIsForgotPassword(false);
+      setAuthMethod('password');
+    } else if (isAtOtpPage) {
+      setIsAtOtpPage(false);
+      setShowOtpInput(false);
+    } else if (authMethod === 'password' || authMethod === 'otp') {
+      setAuthMethod('');
+      setEmailVerified(false);
+    }
+  };
 
   const handleForgotPassword = () => {
     setIsForgotPassword(true)
@@ -312,7 +347,7 @@ const Login = () => {
                 <div className="h-1 w-12 bg-gray-400 rounded-full"></div>
                 <p className="text-sm font-medium text-gray-700">TRUSTED BY TEAMS</p>
               </div>
-              <p className="text-2xl font-light leading-relaxed text-gray-900">
+              <p className="text-2xl leading-relaxed text-gray-900 font-light">
                 "Adya brings the best of AI technology and research, empowering enterprises to scale without vendor lock-in, while retaining sovereignty over their AI."
               </p>
             </div>
@@ -326,7 +361,18 @@ const Login = () => {
 
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md mx-auto space-y-8 px-4">
-        <div className=" border-1 border-gray-300 p-7 rounded-4xl">
+          {/* Back Button - Show on all pages except Welcome page */}
+          {(authMethod === 'password' || authMethod === 'otp' || isForgotPassword || isAtForgotPasswordOtpPage || isPasswordResetPage || isAtOtpPage) && (
+            <button 
+              type="button" 
+              onClick={handleBackButton}
+              className="flex items-center gap-2 px-4 py-2 rounded-md bg-transparent hover:bg-[#f4f4f5] transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={16} />
+              <span>Back</span>
+            </button>
+          )}
+        <div className={`${(authMethod === 'otp' || authMethod === 'password') ? 'border-1 border-gray-300 p-7 rounded-4xl' : ''}`}>
           <div className="flex justify-center lg:hidden">
             
             {authMethod === 'password' || authMethod === 'otp' ? '' : <img src={adyaLogo} alt="Adya Logo" className="h-16 object-contain" />}
@@ -356,6 +402,11 @@ const Login = () => {
             setAuthMethod={setAuthMethod}
             authMethod={authMethod}
             password={"password"}
+            clearErrors={() => {
+              setEmailError('');
+              setError('');
+              setPasswordError('');
+            }}
           />
           ) : ""}
 
@@ -412,7 +463,7 @@ const Login = () => {
                       <button
                         type="button"
                         onClick={() => setShowNewPassword(!showNewPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer"
                       >
                         {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                       </button>
@@ -432,7 +483,7 @@ const Login = () => {
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer"
                       >
                         {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                       </button>
@@ -525,7 +576,44 @@ const Login = () => {
                           setIsPasswordResetPage(true);
                           setIsAtForgotPasswordOtpPage(false);
                         } else {
-                          setError('Invalid OTP. Please try again.');
+                          // Handle OTP error with attempts remaining or blocked until time
+                          console.log('OTP verification failed response:', response.payload);
+                          
+                          // Check for error message in different possible locations in the response
+                          if (response.payload?.error?.message?.number_of_attempts_remaining !== undefined) {
+                            const attemptsRemaining = response.payload.error.message.number_of_attempts_remaining;
+                            if (attemptsRemaining > 0) {
+                              setError(`Invalid OTP. ${attemptsRemaining} attempts left`);
+                            } else if (response.payload.error.message.blocked_until) {
+                              const blockedUntil = new Date(response.payload.error.message.blocked_until);
+                              const formattedDate = blockedUntil.toLocaleString();
+                              setError(`Invalid OTP. Try again after ${formattedDate}`);
+                            } else {
+                              setError('Invalid OTP. Please try again.');
+                            }
+                          } else if (response.payload?.data?.number_of_attempts_remaining !== undefined) {
+                            // Alternative location for attempts remaining
+                            const attemptsRemaining = response.payload.data.number_of_attempts_remaining;
+                            if (attemptsRemaining > 0) {
+                              setError(`Invalid OTP. ${attemptsRemaining} attempts left`);
+                            } else if (response.payload.data.blocked_until) {
+                              const blockedUntil = new Date(response.payload.data.blocked_until);
+                              const formattedDate = blockedUntil.toLocaleString();
+                              setError(`Invalid OTP. Try again after ${formattedDate}`);
+                            } else {
+                              setError('Invalid OTP. Please try again.');
+                            }
+                          } else if (response.payload?.meta?.message) {
+                            // Check if the error message contains attempts information
+                            const message = response.payload.meta.message;
+                            if (typeof message === 'string' && message.includes('attempts')) {
+                              setError(message);
+                            } else {
+                              setError('Invalid OTP. Please try again.');
+                            }
+                          } else {
+                            setError('Invalid OTP. Please try again.');
+                          }
                         }
                       } catch (error: any) {
                         console.error('OTP verification failed:', error);
@@ -563,7 +651,7 @@ const Login = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer"
                     >
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
@@ -590,14 +678,14 @@ const Login = () => {
                     {email}
                   </p>
                   <br/>
-                  <Button 
+                  <button 
                     type="button"
-                    className="py-7 px-5 rounded-md text-black hover:bg-[#f4f4f5] hover:text-black text-sm cursor-pointer bg-white"
+                    className="py-5 px-6 rounded-xl text-black hover:bg-[#f4f4f5] hover:text-black text-sm cursor-pointer bg-white"
                     onClick={() => {
                       setIsAtOtpPage(true);
                       handleSendOtp();
                     }}                    
-                  >Request OTP</Button>
+                  >Request OTP</button>
                 </div>
               ) : (
                 <div className="p-2 text-center">
@@ -688,12 +776,12 @@ const Login = () => {
           <div className="mt-8 text-center text-sm text-gray-500">
             <p>By continuing, you agree to our</p>
             <div className="flex justify-center items-center mt-2 space-x-4">
-              <a href="#" className="flex items-center text-gray-700">
+              <a href="/terms" className="flex items-center text-gray-700">
                 <Lock className="h-4 w-4 mr-1" />
                 Terms of Service
               </a>
               <span className="text-gray-300">|</span>
-              <a href="#" className="flex items-center text-gray-700">
+              <a href="/privacypolicy" className="flex items-center text-gray-700">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="16"

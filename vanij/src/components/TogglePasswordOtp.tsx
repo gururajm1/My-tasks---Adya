@@ -4,24 +4,31 @@ interface TogglePasswordOtpProps {
   setAuthMethod: (method: 'password' | 'otp') => void;
   authMethod: 'password' | 'otp' | '';
   password: string;
+  clearErrors?: () => void;
 }
 
-const TogglePasswordOtp = ({setAuthMethod, authMethod, password}: TogglePasswordOtpProps) => {
+const TogglePasswordOtp = ({setAuthMethod, authMethod, password, clearErrors}: TogglePasswordOtpProps) => {
   return (
          <div>
             <div className="flex gap-2 p-1 bg-gray-100 rounded-lg mb-6">
               <button
                 type="button"
-                className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 ${authMethod === 'password' ? 'bg-white shadow-sm' : ''}`}
-                onClick={() => setAuthMethod('password')}
+                className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 cursor-pointer ${authMethod === 'password' ? 'bg-white shadow-sm' : ''}`}
+                onClick={() => {
+                  setAuthMethod('password');
+                  clearErrors?.();
+                }}
               >
                 <Lock size={16} />
                 <span>Password</span>
               </button>
               <button
                 type="button"
-                className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 ${authMethod === 'otp' ? 'bg-white shadow-sm' : ''}`}
-                onClick={() => setAuthMethod('otp')}
+                className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 cursor-pointer ${authMethod === 'otp' ? 'bg-white shadow-sm' : ''}`}
+                onClick={() => {
+                  setAuthMethod('otp');
+                  clearErrors?.();
+                }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 7L2 7" />

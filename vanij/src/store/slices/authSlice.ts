@@ -64,7 +64,15 @@ export const verifyUserOtp = createAsyncThunk(
       const response = await verifyOtp(email, otp);
       return response;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'OTP verification failed');
+      const errorData = error.response?.data;
+      if (errorData?.error?.number_of_attempts_remaining !== undefined) {
+        if (errorData.error.number_of_attempts_remaining === 0 && errorData.error.blocked_until) {
+          const blockedUntil = new Date(errorData.error.blocked_until);
+          return rejectWithValue(`Otp failed multiple times. Try again after ${blockedUntil.toLocaleString()}`);
+        }
+        return rejectWithValue(`Invalid OTP. ${errorData.error.number_of_attempts_remaining} attempts left`);
+      }
+      return rejectWithValue(errorData?.meta?.message || 'OTP verification failed');
     }
   }
 );

@@ -77,11 +77,33 @@ export const resendOtp = async (email: string) => {
 };
 
 export const verifyOtp = async (email: string, otp: string) => {
-  const response = await axiosInstance.post('/user/verify_otp', {
-    id: 3145,
-    otp,
-  });
-  return response.data;
+  try {
+    const response = await axiosInstance.post('/user/verify_otp', {
+      id: 3145,
+      otp,
+    });
+    return response.data;
+  } catch (error: any) {
+    // Extract error details from the response
+    const errorData = error.response?.data;
+    if (errorData?.error?.message) {
+      const { blocked_until, number_of_attempts_remaining } = errorData.error.message;
+      throw {
+        ...error,
+        response: {
+          ...error.response,
+          data: {
+            meta: errorData.meta,
+            error: {
+              blocked_until,
+              number_of_attempts_remaining
+            }
+          }
+        }
+      };
+    }
+    throw error;
+  }
 };
 
 export const changePassword = async (
